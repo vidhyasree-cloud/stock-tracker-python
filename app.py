@@ -1,7 +1,7 @@
 """Stock Tracker - Step 3: web dashboard (FastAPI)
 Reuses tracker.py: live prices from Yahoo, portfolio.json, simple forecast.
 Run:  uvicorn app:app --reload
-Then open:  http://127.0.0.1:8000
+Then open:  http://127.0.0.1:8000  (user view) and http://127.0.0.1:8000/admin  (admin view)
 Test data only - no real money, no trading. Forecast is a learning model.
 """
 from fastapi import FastAPI, Form
@@ -55,7 +55,53 @@ STYLE = """
     color:#e2e8f0;margin:4px 4px 4px 0} button{padding:11px 18px;border-radius:10px;border:0;
     background:linear-gradient(135deg,#4f46e5,#06b6d4);color:#fff;font-weight:700;cursor:pointer}
     a{color:#67e8f9} .note{color:#94a3b8;font-size:14px}
+    nav{display:flex;gap:8px;margin:16px 0}
+    nav a{padding:8px 14px;border-radius:999px;background:#1e293b;border:1px solid #334155;
+    color:#e2e8f0;text-decoration:none;font-weight:600}
+    nav a.active{background:linear-gradient(135deg,#4f46e5,#06b6d4);border-color:transparent;color:#fff}
+    table{width:100%;border-collapse:collapse;background:#1e293b;border-radius:16px;overflow:hidden}
+    th,td{padding:12px 10px;text-align:left;border-bottom:1px solid #334155;font-size:14px}
+    th{color:#94a3b8;text-transform:uppercase;font-size:12px;letter-spacing:.06em}
+    tr:last-child td{border-bottom:0} tfoot td{font-weight:800;background:#0f172a}
+    .danger{background:#dc2626 !important}
     """
+
+def admin_page(rows, total_value, total_cost):
+    body = ""
+    for r in rows:
+        if "error" in r:
+            body += f"<tr><td>{r['ticker']}</td><td colspan='7'>could not fetch price</td></tr>"
+            continue
+        gain_cls = "up" if r["gain"] >= 0 else "down"
+        body += f"""<tr><td><b>{r['ticker']}</b><br><span class='note'>{r['name']}</span></td>
+        <td>{r['shares']}</td><td>${r['buy']:.2f}</td><td>${r['price']:.2f}</td>
+        <td>${r['buy'] * r['shares']:,.2f}</td><td>${r['value']:,.2f}</td>
+        <td class='{gain_cls}'>${r['gain']:+,.2f}</td>
+        <td>${r['target']:.2f} ({r['direction']})</td>
+        <td><form method='post' action='/remove' style='margin:0'>
+        <input type='hidden' name='ticker' value='{r['ticker']}'><button class='danger'>Remove</button></form></td></tr>"""
+    gain = total_value - total_cost
+    total_shares = sum(r.get("shares", 0) for r in rows)
+    return f"""<!doctype html><html><head><meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <title>Admin — Stock Tracker</title><style>{STYLE}</style></head><body><div class='wrap' style='max-width:960px'>
+    <header><h1>🛠️ Admin View</h1><p>Full view — every share purchased, live prices, totals</p></header>
+    <nav><a href='/'>User view</a><a href='/admin' class='active'>Admin view</a></nav>
+    <div class='total-card'>
+      <div><div class='label'>Holdings</div><div class='big'>{len(rows)}</div></div>
+      <div><div class='label'>Total shares</div><div class='big'>{total_shares:g}</div></div>
+      <div><div class='label'>Total paid</div><div class='big'>${total_cost:,.2f}</div></div>
+      <div><div class='label'>Total value</div><div class='big'>${total_value:,.2f}</div></div>
+      <div><div class='label'>All-time gain</div><div class='big {"up" if gain >= 0 else "down"}'>${gain:+,.2f}</div></div>
+    </div>
+    <table><thead><tr><th>Stock</th><th>Shares</th><th>Buy price</th><th>Live price</th>
+    <th>Paid</th><th>Value</th><th>Gain</th><th>30-day forecast</th><th></th></tr></thead>
+    <tbody>{body or "<tr><td colspan='9'>No holdings yet.</td></tr>"}</tbody>
+    <tfoot><tr><td>Total</td><td>{total_shares:g}</td><td></td><td></td>
+    <td>${total_cost:,.2f}</td><td>${total_value:,.2f}</td><td>${gain:+,.2f}</td><td></td><td></td></tr></tfoot></table>
+    <p class='note'>Test data only — no real money, no trading. Forecast is a learning model, not advice.</p>
+    <p><a href='/admin'>↻ Refresh prices</a></p>
+    </div></body></html>"""
 
 def page(rows, total_value, total_cost):
     cards = ""
@@ -81,6 +127,7 @@ def page(rows, total_value, total_cost):
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <title>Stock Tracker</title><style>{STYLE}</style></head><body><div class='wrap'>
     <header><h1>📈 Stock Tracker</h1><p>Live prices · portfolio value · AI-style trend forecast</p></header>
+    <nav><a href='/' class='active'>User view</a><a href='/admin'>Admin view</a></nav>
     <div class='total-card'>
       <div><div class='label'>Total value</div><div class='big'>${total_value:,.2f}</div></div>
       <div><div class='label'>All-time gain</div><div class='big {gain_cls}'>${gain:+,.2f}</div></div>
@@ -106,6 +153,17 @@ def page(rows, total_value, total_cost):
 def home():
     rows, tv, tc = portfolio_rows()
     return page(rows, tv, tc)
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin():
+    rows, tv, tc = portfolio_rows()
+    return admin_page(rows, tv, tc)
+
+@app.post("/remove")
+def remove(ticker: str = Form(...)):
+    p = tracker.load_portfolio(); p.pop(ticker.strip().upper(), None)
+    tracker.save_portfolio(p)
+    return RedirectResponse("/admin", status_code=303)
 
 @app.post("/add")
 def add(ticker: str = Form(...), shares: float = Form(...), buy_price: float = Form(...)):
