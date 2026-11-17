@@ -4,49 +4,11 @@ Run:  uvicorn app:app --reload
 Then open:  http://127.0.0.1:8000  (user view) and http://127.0.0.1:8000/admin  (admin view)
 Test data only - no real money, no trading. Forecast is a learning model.
 """
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-import hashlib, os
 import tracker
 
 app = FastAPI(title="Stock Tracker")
-
-def admin_password():
-    """The one admin password, read fresh on every request.
-    1) ADMIN_PASSWORD env var if set, else
-    2) admin_password.txt next to app.py (one line, your password only).
-    That file is gitignored — it never goes to GitHub, and it works in any
-    PowerShell window, so there is no 'wrong window' mismatch."""
-    env_pw = os.environ.get("ADMIN_PASSWORD", "").strip()
-    if env_pw:
-        return env_pw
-    try:
-        with open(os.path.join(os.path.dirname(__file__), "admin_password.txt")) as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        return ""
-
-def _auth_token(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
-
-def is_admin(request: Request):
-    pw = admin_password()
-    return bool(pw) and request.cookies.get("admin_auth") == _auth_token(pw)
-
-def login_page(message=""):
-    return f"""<!doctype html><html><head><meta charset='utf-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <title>Admin login — Stock Tracker</title><style>{STYLE}</style></head><body><div class='wrap'>
-    <header><h1>🛠️ Admin View</h1><p>Enter the admin password to see the full view</p></header>
-    <nav><a href='/'>User view</a><a href='/admin' class='active'>Admin view</a></nav>
-    <section><h2>Admin password</h2>
-    <p style='color:#f87171'>{message}</p>
-    <form method='post' action='/admin/login'>
-      <input name='password' type='password' placeholder='Admin password' required>
-      <button>Unlock admin</button>
-    </form></section>
-    <p class='note'>The password lives only on this computer — in admin_password.txt or ADMIN_PASSWORD. It is not in the code or on GitHub.</p>
-    </div></body></html>"""
 
 def portfolio_rows():
     rows, total_value, total_cost = [], 0.0, 0.0
@@ -138,7 +100,7 @@ def admin_page(rows, total_value, total_cost):
     <tfoot><tr><td>Total</td><td>{total_shares:g}</td><td></td><td></td>
     <td>${total_cost:,.2f}</td><td>${total_value:,.2f}</td><td>${gain:+,.2f}</td><td></td><td></td></tr></tfoot></table>
     <p class='note'>Test data only — no real money, no trading. Forecast is a learning model, not advice.</p>
-    <p><a href='/admin'>↻ Refresh prices</a> · <a href='/admin/logout'>Log out of admin</a></p>
+    <p><a href='/admin'>↻ Refresh prices</a></p>
     </div></body></html>"""
 
 def page(rows, total_value, total_cost):
@@ -193,34 +155,12 @@ def home():
     return page(rows, tv, tc)
 
 @app.get("/admin", response_class=HTMLResponse)
-def admin(request: Request):
-    if not admin_password():
-        return HTMLResponse(login_page("No admin password is set on this computer yet. "
-            "Set ADMIN_PASSWORD before starting the server, then refresh."))
-    if not is_admin(request):
-        return HTMLResponse(login_page())
+def admin():
     rows, tv, tc = portfolio_rows()
     return admin_page(rows, tv, tc)
 
-@app.post("/admin/login")
-def admin_login(password: str = Form(...)):
-    pw = admin_password()
-    if pw and password == pw:
-        r = RedirectResponse("/admin", status_code=303)
-        r.set_cookie("admin_auth", _auth_token(pw), httponly=True, samesite="lax")
-        return r
-    return HTMLResponse(login_page("Wrong password — try again."))
-
-@app.get("/admin/logout")
-def admin_logout():
-    r = RedirectResponse("/", status_code=303)
-    r.delete_cookie("admin_auth")
-    return r
-
 @app.post("/remove")
-def remove(request: Request, ticker: str = Form(...)):
-    if not is_admin(request):
-        return RedirectResponse("/admin", status_code=303)
+def remove(ticker: str = Form(...)):
     p = tracker.load_portfolio(); p.pop(ticker.strip().upper(), None)
     tracker.save_portfolio(p)
     return RedirectResponse("/admin", status_code=303)

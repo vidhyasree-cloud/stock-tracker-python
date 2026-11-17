@@ -43,3 +43,8 @@ The password file is the reliable way — it works in any PowerShell window:
 3. Restart the server once, then open /admin and type that same password
 `admin_password.txt` is gitignored and never pushed to GitHub.
 (ADMIN_PASSWORD env var still works too, if you prefer it.)
+
+## Admin password — removed 2026-11-17
+The password lock was removed at Vidya's request. /admin is open again,
+same as the user view — no login, no password file needed. If you created
+admin_password.txt on your PC, you can delete it.
