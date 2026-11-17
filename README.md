@@ -18,3 +18,9 @@ python tracker.py
 ## Next steps (later, one at a time)
 Step 2: a real ML forecast (e.g. linear regression on closes, then compare it with this trend baseline)
 Step 3: a web page for the tracker (FastAPI) instead of the terminal menu
+
+## Step 3: web dashboard
+```
+uvicorn app:app --reload
+```
+Open http://127.0.0.1:8000 — total value, holdings, forecast, add-holding form, one-stock lookup.
