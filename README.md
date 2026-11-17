@@ -35,3 +35,11 @@ $env:ADMIN_PASSWORD="your-password-here"
 Then open /admin, type the password once, and it stays unlocked in that
 browser until you tap "Log out of admin". If no password is set, /admin
 tells you to set one first.
+
+## Admin password (simpler way)
+The password file is the reliable way — it works in any PowerShell window:
+1. In the project folder, create a file named `admin_password.txt`
+2. Put only your password in it, one line, no quotes, no spaces around it
+3. Restart the server once, then open /admin and type that same password
+`admin_password.txt` is gitignored and never pushed to GitHub.
+(ADMIN_PASSWORD env var still works too, if you prefer it.)

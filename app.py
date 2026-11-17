@@ -12,10 +12,19 @@ import tracker
 app = FastAPI(title="Stock Tracker")
 
 def admin_password():
-    """The one admin password. Set it on YOUR PC before starting the server:
-    $env:ADMIN_PASSWORD="your-password-here"
-    It is never written in the code, the repo, or chat."""
-    return os.environ.get("ADMIN_PASSWORD", "")
+    """The one admin password, read fresh on every request.
+    1) ADMIN_PASSWORD env var if set, else
+    2) admin_password.txt next to app.py (one line, your password only).
+    That file is gitignored — it never goes to GitHub, and it works in any
+    PowerShell window, so there is no 'wrong window' mismatch."""
+    env_pw = os.environ.get("ADMIN_PASSWORD", "").strip()
+    if env_pw:
+        return env_pw
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "admin_password.txt")) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return ""
 
 def _auth_token(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
@@ -36,7 +45,7 @@ def login_page(message=""):
       <input name='password' type='password' placeholder='Admin password' required>
       <button>Unlock admin</button>
     </form></section>
-    <p class='note'>The password is set on this computer only, with ADMIN_PASSWORD. It is not in the code or on GitHub.</p>
+    <p class='note'>The password lives only on this computer — in admin_password.txt or ADMIN_PASSWORD. It is not in the code or on GitHub.</p>
     </div></body></html>"""
 
 def portfolio_rows():
