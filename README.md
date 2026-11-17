@@ -24,3 +24,14 @@ Step 3: a web page for the tracker (FastAPI) instead of the terminal menu
 uvicorn app:app --reload
 ```
 Open http://127.0.0.1:8000 — total value, holdings, forecast, add-holding form, one-stock lookup.
+
+## Admin password
+User view (`/`) is open. Admin view (`/admin`) needs one password, set on
+your own computer only — never in the code or on GitHub:
+```powershell
+$env:ADMIN_PASSWORD="your-password-here"
+.\.venv\Scripts\uvicorn.exe app:app --reload
+```
+Then open /admin, type the password once, and it stays unlocked in that
+browser until you tap "Log out of admin". If no password is set, /admin
+tells you to set one first.
